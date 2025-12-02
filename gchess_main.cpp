@@ -41,6 +41,10 @@ PieceColor stringToColor(const std::string& s) {
     return PieceColor::NONE;
 }
 
+std::string getGameName(GameType t) {
+    return (t == GameType::GOMOKU) ? "五子棋" : "围棋";
+}
+
 // ==========================================
 // 1. 享元模式 (Flyweight Pattern)
 // ==========================================
@@ -57,7 +61,7 @@ public:
 class BlackPiece : public Piece {
 public:
     PieceColor getColor() const override { return PieceColor::BLACK; }
-    std::string getSymbol() const override { return "田"; } 
+    std::string getSymbol() const override { return "回"; } 
 };
 
 // 具体棋子：白棋
@@ -232,12 +236,17 @@ public:
         
         notifyBoardUpdate();
 
-        if (winner != PieceColor::NONE) {
-            notifyGameOver(winner);
-        } else {
-            switchPlayer();
-            notifyMessage("轮到 " + colorToString(currentPlayer) + " 落子");
-        }
+        // [修改] AbstractGame 类中 makeMove 方法底部
+		if (winner != PieceColor::NONE) {
+		    // 因为 UI 不再自动弹窗提示胜者，这里需要手动发消息
+		    std::string w = colorToString(winner);
+		    notifyMessage(">>> 决出胜负！获胜者: " + w + " <<<");
+		    
+		    notifyGameOver(winner);
+		} else {
+		    switchPlayer();
+		    notifyMessage("轮到 " + colorToString(currentPlayer) + " 落子");
+		}
     }
 // --- 模板方法：停一手 (围棋) ---
     void passTurn() {
@@ -247,16 +256,25 @@ public:
         passCount++; 
         
         if (passCount >= 2) {
-            // 【修改点 2】双方停手，forceEnd = true
-            // 此时 GoWinStrategy 会执行数子逻辑并返回胜者
-            PieceColor winner = winStrategy->checkWin(board, size, true);
-            
-            std::string details = winStrategy->getResultDescription();
-            notifyMessage(">>> 双方停手，开始结算 <<<");
-            if (!details.empty()) notifyMessage(details);
-            notifyGameOver(winner);
-            passCount = 0; 
-            return; 
+			// 双方停手，forceEnd = true
+	        PieceColor winner = winStrategy->checkWin(board, size, true);
+	        
+	        std::string details = winStrategy->getResultDescription();
+	        std::string winnerStr = colorToString(winner);
+	
+	        // 组装完整信息：包含 1.结算提示 2.分数详情 3.最终胜者
+	        std::stringstream ss;
+	        ss << ">>> 双方停手，开始结算 <<<\n";
+	        if (!details.empty()) {
+	            ss << details << "\n";
+	        }
+	        ss << ">>> 最终结果: " + winnerStr + " 胜 <<<";
+	
+	        notifyMessage(ss.str()); // 发送合并后的长消息
+	        notifyGameOver(winner);  // 此时 UI 只会更新状态栏，不会覆盖这条消息
+	
+	        passCount = 0; 
+	        return;
         }
 
         switchPlayer();
@@ -276,9 +294,14 @@ public:
 
     // --- 通用功能：认输 ---
     void resign() {
-        PieceColor winner = (currentPlayer == PieceColor::BLACK) ? PieceColor::WHITE : PieceColor::BLACK;
-        notifyGameOver(winner);
-    }
+	    PieceColor winner = (currentPlayer == PieceColor::BLACK) ? PieceColor::WHITE : PieceColor::BLACK;
+	    std::string w = colorToString(winner);
+	    
+	    // 手动发送胜负消息
+	    notifyMessage(">>> 对方认输，获胜者: " + w + " <<<");
+	    
+	    notifyGameOver(winner);
+	}
 
     // --- 备忘录管理 ---
     void saveStateToHistory() {
@@ -611,7 +634,7 @@ public:
             std::cout << std::setw(2) << i + 1 << " ";
             for (int j = 0; j < size; ++j) {
                 int val = (*data)[i][j];
-                if (val == 0) std::cout << " + ";
+                if (val == 0) std::cout << "十 ";
                 // 这里为了演示，依旧使用了享元工厂，实际项目中建议解耦
                 else if (val == 1) std::cout << PieceFactory::getPiece(PieceColor::BLACK)->getSymbol() << " ";
                 else if (val == 2) std::cout << PieceFactory::getPiece(PieceColor::WHITE)->getSymbol() << " ";
@@ -647,23 +670,28 @@ public:
     // --- IGameObserver 实现 ---
     void onBoardUpdate(const std::vector<std::vector<int>>& board, int size) override {
         boardRef->update(board, size);
-        render();
+        //render();
     }
 
     void onMessage(const std::string& msg) override {
         hintRef->setText("[系统消息] " + msg);
-        render();
+        //render();
     }
 
     void onGameOver(PieceColor winner) override {
-        std::string w = (winner == PieceColor::BLACK) ? "黑方" : "白方";
-        // 同时更新两个组件，体现分离
-        statusRef->setText("状态: 游戏结束"); 
-        hintRef->setText(">>> 决出胜负！获胜者: " + w + " <<<");
-        render();
-    }
-    // -------------------------
+        std::string w = colorToString(winner);
+        // 同时更新两个组件
+		statusRef->setText("游戏结束 (胜者: " + w + ")");
 
+        //render();
+    }
+    
+    // -------------------------
+	void updateGameStatus(const std::string& gameName) {
+        std::string display = "当前游戏: <" + gameName + "> ";
+        statusRef->setText(display);
+    }
+    
     void toggleHints() {
         static bool v = true;
         v = !v;
@@ -770,10 +798,12 @@ public:
         std::stringstream ss(line);
         std::string cmd;
         ss >> cmd;
-
+		bool needRender = true;
+		
         try {
             if (cmd == "exit") {
                 running = false;
+                needRender = false;
             } else if (cmd == "help") {
                 std::string help = "指令列表:\n"
                                    "  start gomoku|go [8-19] : 开始新游戏\n"
@@ -787,12 +817,12 @@ public:
                                    "  exit : 退出";
                 ui->onMessage(help);
             } else if (cmd == "start") {
-std::string typeStr;
+				std::string typeStr;
                 int size;
                 ss >> typeStr >> size;
                 if (size < 8 || size > 19) throw GameException("尺寸必须在 8 到 19 之间");
                 
-                // 【重构核心】：根据输入选择对应的工厂
+                // 根据输入选择对应的工厂
                 std::shared_ptr<IGameFactory> factory;
                 if (typeStr == "go") {
                     factory = std::make_shared<GoFactory>();
@@ -804,6 +834,7 @@ std::string typeStr;
 
                 // 使用工厂创建产品
                 game = factory->createGame(size);
+                ui->updateGameStatus(getGameName(game->getType()));
                 
                 game->addObserver(ui);
                 game->refresh();
@@ -839,7 +870,7 @@ std::string typeStr;
                 // 反序列化备忘录
                 auto mem = GameMemento::deserialize(ifs);
                 
-                // 【重构核心】：根据存档记录的游戏类型选择工厂
+                // 根据存档记录的游戏类型选择工厂
                 std::shared_ptr<IGameFactory> factory;
                 if (mem->getGameType() == GameType::GO) {
                     factory = std::make_shared<GoFactory>();
@@ -850,8 +881,9 @@ std::string typeStr;
                 // 重建游戏并恢复状态
                 game = factory->createGame(mem->getBoardSize());
                 game->restoreMemento(mem);
-                game->addObserver(ui);
                 
+				ui->updateGameStatus(getGameName(game->getType()));
+                game->addObserver(ui);
                 game->refresh();
                 ui->onMessage("游戏已读取: " + file);
             } else if (cmd == "hint") {
@@ -865,17 +897,17 @@ std::string typeStr;
         }
         
         // 确保命令执行后刷新（如果不是exit）
-        if(running && cmd != "load") { // load特殊处理过
-             // 如果需要强制刷新，可以在这里调用，但通常由Observer回调处理
+        if (running && needRender) {
+             ui->render();
         }
     }
 };
 
-GameSystem* GameSystem::instance = nullptr;
-
 // ==========================================
 // 9. 主程序入口
 // ==========================================
+
+GameSystem* GameSystem::instance = nullptr;
 
 int main() {
     // 设置本地化以支持中文显示（视控制台环境而定，Windows可能需要chcp 65001）
