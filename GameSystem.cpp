@@ -5,22 +5,22 @@
 #include <fstream>
 #include <iostream>
 
-// å•ä¾‹å®ä¾‹
+// µ¥ÀıÊµÀı
 GameSystem* GameSystem::instance = nullptr;
 
-// ç§æœ‰æ„é€ å‡½æ•°
+// Ë½ÓĞ¹¹Ôìº¯Êı
 GameSystem::GameSystem() : running(true) {
     StandardUIBuilder builder;
     ui = builder.build();
 }
 
-// å•ä¾‹è·å–æ–¹æ³•
+// µ¥Àı»ñÈ¡·½·¨
 GameSystem* GameSystem::getInstance() {
     if (instance == nullptr) instance = new GameSystem();
     return instance;
 }
 
-// ä¸»è¿è¡Œå¾ªç¯
+// Ö÷ÔËĞĞÑ­»·
 void GameSystem::run() {
     ui->render();
     std::string line;
@@ -30,7 +30,7 @@ void GameSystem::run() {
     }
 }
 
-// å‘½ä»¤å¤„ç†
+// ÃüÁî´¦Àí
 void GameSystem::processCommand(const std::string& line) {
     std::stringstream ss(line);
     std::string cmd;
@@ -42,72 +42,72 @@ void GameSystem::processCommand(const std::string& line) {
             running = false;
             needRender = false;
         } else if (cmd == "help") {
-            std::string help = "æŒ‡ä»¤åˆ—è¡¨:\n"
-                               "  start gomoku|go [8-19] : å¼€å§‹æ–°æ¸¸æˆ\n"
-                               "  move x y : è½å­ (è¡Œ åˆ—ï¼Œä»1å¼€å§‹)\n"
-                               "  pass : åœä¸€æ‰‹ (ä»…å›´æ£‹)\n"
-                               "  undo : æ‚”æ£‹\n"
-                               "  resign : è®¤è¾“\n"
-                               "  save filename : ä¿å­˜\n"
-                               "  load filename : è¯»å–\n"
-                               "  hint : å¼€å…³æç¤º\n"
-                               "  exit : é€€å‡º";
+            std::string help = "Ö¸ÁîÁĞ±í:\n"
+                               "  start gomoku|go [8-19] : ¿ªÊ¼ĞÂÓÎÏ·\n"
+                               "  move x y : Âä×Ó (ĞĞ ÁĞ£¬´Ó1¿ªÊ¼)\n"
+                               "  pass : Í£Ò»ÊÖ (½öÎ§Æå)\n"
+                               "  undo : »ÚÆå\n"
+                               "  resign : ÈÏÊä\n"
+                               "  save filename : ±£´æ\n"
+                               "  load filename : ¶ÁÈ¡\n"
+                               "  hint : ¿ª¹ØÌáÊ¾\n"
+                               "  exit : ÍË³ö";
             ui->onMessage(help);
         } else if (cmd == "start") {
             std::string typeStr;
             int size;
             ss >> typeStr >> size;
-            if (size < 8 || size > 19) throw GameException("å°ºå¯¸å¿…é¡»åœ¨ 8 åˆ° 19 ä¹‹é—´");
+            if (size < 8 || size > 19) throw GameException("³ß´ç±ØĞëÔÚ 8 µ½ 19 Ö®¼ä");
             
-            // æ ¹æ®è¾“å…¥é€‰æ‹©å¯¹åº”çš„å·¥å‚
+            // ¸ù¾İÊäÈëÑ¡Ôñ¶ÔÓ¦µÄ¹¤³§
             std::shared_ptr<IGameFactory> factory;
             if (typeStr == "go") {
                 factory = std::make_shared<GoFactory>();
             } else if (typeStr == "gomoku") {
                 factory = std::make_shared<GomokuFactory>();
             } else {
-                throw GameException("æœªçŸ¥çš„æ¸¸æˆç±»å‹ï¼Œè¯·è¾“å…¥ go æˆ– gomoku");
+                throw GameException("Î´ÖªµÄÓÎÏ·ÀàĞÍ£¬ÇëÊäÈë go »ò gomoku");
             }
 
-            // ä½¿ç”¨å·¥å‚åˆ›å»ºäº§å“
+            // Ê¹ÓÃ¹¤³§´´½¨²úÆ·
             game = factory->createGame(size);
             ui->updateGameStatus(getGameName(game->getType()));
             
             game->addObserver(ui);
             game->refresh();
         } else if (cmd == "move") {
-            if (!game) throw GameException("æ¸¸æˆæœªå¼€å§‹");
+            if (!game) throw GameException("ÓÎÏ·Î´¿ªÊ¼");
             int r, c;
             ss >> r >> c;
-            game->makeMove(r - 1, c - 1); // ç”¨æˆ·è¾“å…¥1-basedï¼Œå†…éƒ¨0-based
+            game->makeMove(r - 1, c - 1); // ÓÃ»§ÊäÈë1-based£¬ÄÚ²¿0-based
         } else if (cmd == "pass") {
-            if (!game) throw GameException("æ¸¸æˆæœªå¼€å§‹");
+            if (!game) throw GameException("ÓÎÏ·Î´¿ªÊ¼");
             game->passTurn();
         } else if (cmd == "undo") {
-            if (!game) throw GameException("æ¸¸æˆæœªå¼€å§‹");
+            if (!game) throw GameException("ÓÎÏ·Î´¿ªÊ¼");
             game->undo();
         } else if (cmd == "resign") {
-            if (!game) throw GameException("æ¸¸æˆæœªå¼€å§‹");
+            if (!game) throw GameException("ÓÎÏ·Î´¿ªÊ¼");
             game->resign();
-            game = nullptr; // ç»“æŸå¼•ç”¨
+            game = nullptr; // ½áÊøÒıÓÃ
         } else if (cmd == "save") {
-            if (!game) throw GameException("æ¸¸æˆæœªå¼€å§‹");
+            if (!game) throw GameException("ÓÎÏ·Î´¿ªÊ¼");
             std::string file;
             ss >> file;
             std::ofstream ofs(file);
-            if (!ofs) throw GameException("æ–‡ä»¶åˆ›å»ºå¤±è´¥");
+            if (!ofs) throw GameException("ÎÄ¼ş´´½¨Ê§°Ü");
             ofs << game->createMemento()->serialize();
-            ui->onMessage("æ¸¸æˆå·²ä¿å­˜è‡³ " + file);
+            ui->onMessage("ÓÎÏ·ÒÑ±£´æÖÁ " + file);
         } else if (cmd == "load") {
             std::string file;
             ss >> file;
             std::ifstream ifs(file);
-            if (!ifs) throw GameException("æ–‡ä»¶è¯»å–å¤±è´¥");
+            if (!ifs) throw GameException("ÎÄ¼ş¶ÁÈ¡Ê§°Ü");
             
-            // ååºåˆ—åŒ–å¤‡å¿˜å½•
+            // ·´ĞòÁĞ»¯±¸ÍüÂ¼
             auto mem = GameMemento::deserialize(ifs);
             
-            // æ ¹æ®å­˜æ¡£è®°å½•çš„æ¸¸æˆç±»å‹é€‰æ‹©å·¥å‚
+            // ¸ù¾İ´æµµ¼ÇÂ¼µÄÓÎÏ·ÀàĞÍÑ¡Ôñ¹¤³§
             std::shared_ptr<IGameFactory> factory;
             if (mem->getGameType() == GameType::GO) {
                 factory = std::make_shared<GoFactory>();
@@ -115,25 +115,25 @@ void GameSystem::processCommand(const std::string& line) {
                 factory = std::make_shared<GomokuFactory>();
             }
 
-            // é‡å»ºæ¸¸æˆå¹¶æ¢å¤çŠ¶æ€
+            // ÖØ½¨ÓÎÏ·²¢»Ö¸´×´Ì¬
             game = factory->createGame(mem->getBoardSize());
             game->restoreMemento(mem);
             
             ui->updateGameStatus(getGameName(game->getType()));
             game->addObserver(ui);
             game->refresh();
-            ui->onMessage("æ¸¸æˆå·²è¯»å–: " + file);
+            ui->onMessage("ÓÎÏ·ÒÑ¶ÁÈ¡: " + file);
         } else if (cmd == "hint") {
             ui->toggleHints();
         } else {
-            throw GameException("æœªçŸ¥æŒ‡ä»¤");
+            throw GameException("Î´ÖªÖ¸Áî");
         }
     } catch (const std::exception& e) {
-        // å¼‚å¸¸å¤„ç†ï¼šåœ¨UIå±‚æ˜¾ç¤ºé”™è¯¯
-        ui->onMessage(std::string("é”™è¯¯: ") + e.what());
+        // Òì³£´¦Àí£ºÔÚUI²ãÏÔÊ¾´íÎó
+        ui->onMessage(std::string("´íÎó: ") + e.what());
     }
     
-    // ç¡®ä¿å‘½ä»¤æ‰§è¡Œååˆ·æ–°
+    // È·±£ÃüÁîÖ´ĞĞºóË¢ĞÂ
     if (running && needRender) {
          ui->render();
     }
